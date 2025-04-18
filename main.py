@@ -253,7 +253,7 @@ def start_app(selected_theme):
 
     theme_label = ttkb.Label(settings_page, text="Choose Theme:", font=("Arial", 12))
     theme_label.pack(pady=10)
-    themes = ["darkly", "flatly", "superhero", "cosmo", "cerulean", "lux", "minty", "solar", "sandstone"]
+    themes = ["darkly", "flatly", "superhero", "cosmo", "cerulean", "minty", "solar", "sandstone"]
     theme_combobox = ttkb.Combobox(settings_page, values=themes, state="readonly", bootstyle="light")
     theme_combobox.set(selected_theme)
     theme_combobox.pack(pady=10)
