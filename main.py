@@ -54,9 +54,9 @@ def show_frame(frame):
 def connect_db():
     return mysql.connector.connect(
         host="localhost",
-        user="user",
-        password="password",
-        database="database",
+        user="tkinter",
+        password="JBq-tbdObGrWkrqg",
+        database="tkinter",
     )
 
 # ----------------- Register -----------------
@@ -167,6 +167,21 @@ def upload_file():
 
     if file_path:
         uploaded_file = file_path
+        file_name = os.path.basename(uploaded_file)
+        with open(uploaded_file, 'rb') as file:
+            file_data = file.read()
+
+        # Store file in database (BLOB column)
+        db = connect_db()
+        cursor = db.cursor()
+
+        cursor.execute("INSERT INTO files (username, file_name, file_data) VALUES (%s, %s, %s)",
+                       (username_entry.get(), file_name, file_data))
+        db.commit()
+        messagebox.showinfo("File Upload", f"File '{file_name}' uploaded successfully!")
+        cursor.close()
+        db.close()
+
         # Preview image if it is an image
         if uploaded_file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
             image = Image.open(uploaded_file)
@@ -175,7 +190,7 @@ def upload_file():
             image_label.config(image=photo, text="")
             image_label.image = photo  # Keep a reference to avoid garbage collection
         else:
-            image_label.config(image='', text="File uploaded: " + os.path.basename(uploaded_file))
+            image_label.config(image='', text="File uploaded: " + file_name)
         image_label.pack(pady=20)
 
 Button(dashboard_page, text="Upload File", command=upload_file).pack(pady=20)
