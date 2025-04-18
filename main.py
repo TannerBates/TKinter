@@ -1,9 +1,10 @@
 from tkinter import *
 from tkinter import messagebox, filedialog
-from PIL import Image, ImageTk  # Install Pillow for image handling
+from PIL import Image, ImageTk
 import mysql.connector
 import bcrypt
 import os
+import tempfile
 
 m = Tk()
 
@@ -12,7 +13,6 @@ window_width = 800
 window_height = 500
 screen_width = m.winfo_screenwidth()
 screen_height = m.winfo_screenheight()
-
 x = (screen_width // 2) - (window_width // 2)
 y = (screen_height // 2) - (window_height // 2)
 m.geometry(f"{window_width}x{window_height}+{x}+{y}")
@@ -70,11 +70,9 @@ def register_user():
 
     db = connect_db()
     cursor = db.cursor()
-
-    # Check if user already exists
     cursor.execute("SELECT * FROM users WHERE username = %s", (username,))
     if cursor.fetchone():
-        messagebox.showerror("Error", "Username already exists. Please choose another.")
+        messagebox.showerror("Error", "Username already exists.")
         cursor.close()
         db.close()
         return
@@ -131,7 +129,6 @@ sidebar.pack(side=LEFT, fill=Y)
 main_content = Frame(dashboard_frame, bg="#ecf0f1")
 main_content.pack(side=RIGHT, fill=BOTH, expand=True)
 
-# Sub-pages inside main_content
 dashboard_page = Frame(main_content, bg="#ecf0f1")
 profile_page = Frame(main_content, bg="#ecf0f1")
 settings_page = Frame(main_content, bg="#ecf0f1")
@@ -145,6 +142,7 @@ def show_page(page):
 def logout():
     username_entry.delete(0, END)
     password_entry.delete(0, END)
+    image_label.config(image="", text="No file uploaded.")
     show_frame(login_frame)
 
 # Sidebar buttons
@@ -152,14 +150,84 @@ def add_sidebar_button(name, command):
     Button(sidebar, text=name, bg="#34495e", fg="white", font=('Arial', 11),
            relief="flat", command=command, padx=10, pady=10).pack(fill=X)
 
+
+# ----------------- Profile Page Content -----------------
+
+profile_pic_label = Label(profile_page, text="No profile picture uploaded.", bg="#ecf0f1", font=("Arial", 12))
+profile_pic_label.pack(pady=10)
+
+def upload_profile_picture():
+    file_path = filedialog.askopenfilename(
+        title="Select Profile Picture",
+        filetypes=[("Image Files", "*.png;*.jpg;*.jpeg;*.gif")]
+    )
+    if file_path:
+        image = Image.open(file_path)
+        image = image.resize((150, 150))
+        photo = ImageTk.PhotoImage(image)
+        profile_pic_label.config(image=photo, text="")
+        profile_pic_label.image = photo
+
+        # Optionally save profile picture to DB or local storage
+        messagebox.showinfo("Profile Picture", "Profile picture updated successfully!")
+
+Button(profile_page, text="Upload Profile Picture", command=upload_profile_picture).pack(pady=10)
+
+# Display username from login
+logged_in_username = StringVar()
+Label(profile_page, text="Username:", font=("Arial", 12), bg="#ecf0f1").pack(pady=(20, 5))
+Label(profile_page, textvariable=logged_in_username, font=("Arial", 12, "bold"), bg="#ecf0f1").pack()
+
+# Password Reset Section
+Label(profile_page, text="Reset Password", font=("Arial", 14, "bold"), bg="#ecf0f1").pack(pady=(30, 10))
+
+new_password_entry = Entry(profile_page, show="*", width=30)
+confirm_password_entry = Entry(profile_page, show="*", width=30)
+
+Label(profile_page, text="New Password:", bg="#ecf0f1").pack()
+new_password_entry.pack(pady=5)
+
+Label(profile_page, text="Confirm Password:", bg="#ecf0f1").pack()
+confirm_password_entry.pack(pady=5)
+
+def reset_password():
+    new_password = new_password_entry.get()
+    confirm_password = confirm_password_entry.get()
+
+    if new_password != confirm_password:
+        messagebox.showerror("Error", "Passwords do not match.")
+        return
+    if not new_password:
+        messagebox.showerror("Error", "Password cannot be empty.")
+        return
+
+    hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+
+    db = connect_db()
+    cursor = db.cursor()
+    try:
+        cursor.execute("UPDATE users SET password = %s WHERE username = %s", (hashed_password, logged_in_username.get()))
+        db.commit()
+        messagebox.showinfo("Success", "Password updated successfully.")
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to update password: {e}")
+    finally:
+        cursor.close()
+        db.close()
+        new_password_entry.delete(0, END)
+        confirm_password_entry.delete(0, END)
+
+Button(profile_page, text="Update Password", command=reset_password).pack(pady=10)
+
+
 add_sidebar_button("Dashboard", lambda: show_page(dashboard_page))
 add_sidebar_button("Profile", lambda: show_page(profile_page))
 add_sidebar_button("Settings", lambda: show_page(settings_page))
 add_sidebar_button("Logout", logout)
 
-# ----------------- File Upload -----------------
+# ----------------- File Upload and Preview -----------------
 uploaded_file = None
-image_label = Label(dashboard_page, text="No file uploaded.", font=("Arial", 12))
+image_label = Label(dashboard_page, text="No file uploaded.", font=("Arial", 12), bg="#ecf0f1")
 
 def upload_file():
     global uploaded_file
@@ -167,36 +235,35 @@ def upload_file():
 
     if file_path:
         uploaded_file = file_path
-        file_name = os.path.basename(uploaded_file)
-        with open(uploaded_file, 'rb') as file:
+        file_name = os.path.basename(file_path)
+        with open(file_path, 'rb') as file:
             file_data = file.read()
 
-        # Store file in database (BLOB column)
         db = connect_db()
         cursor = db.cursor()
 
         cursor.execute("INSERT INTO files (username, file_name, file_data) VALUES (%s, %s, %s)",
                        (username_entry.get(), file_name, file_data))
         db.commit()
-        messagebox.showinfo("File Upload", f"File '{file_name}' uploaded successfully!")
         cursor.close()
         db.close()
 
-        # Preview image if it is an image
-        if uploaded_file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
-            image = Image.open(uploaded_file)
-            image = image.resize((200, 200))  # Resize the image for preview
+        messagebox.showinfo("File Upload", f"File '{file_name}' uploaded successfully!")
+
+        ext = os.path.splitext(file_name)[1].lower()
+        if ext in ['.png', '.jpg', '.jpeg', '.gif']:
+            image = Image.open(file_path)
+            image = image.resize((200, 200))
             photo = ImageTk.PhotoImage(image)
             image_label.config(image=photo, text="")
-            image_label.image = photo  # Keep a reference to avoid garbage collection
+            image_label.image = photo
         else:
-            image_label.config(image='', text="File uploaded: " + file_name)
-        image_label.pack(pady=20)
+            image_label.config(image='', text=f"File uploaded: {file_name}")
 
 Button(dashboard_page, text="Upload File", command=upload_file).pack(pady=20)
 image_label.pack(pady=10)
 
-# ----------------- Start with login -----------------
+# ----------------- Start -----------------
 show_frame(login_frame)
 show_page(dashboard_page)
 
