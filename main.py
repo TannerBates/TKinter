@@ -54,9 +54,9 @@ def show_frame(frame):
 def connect_db():
     return mysql.connector.connect(
         host="localhost",
-        user="tkinter",
-        password="JBq-tbdObGrWkrqg",
-        database="tkinter",
+        user="user",
+        password="password",
+        database="database",
     )
 
 # ----------------- Register -----------------
