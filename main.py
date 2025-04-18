@@ -1,19 +1,33 @@
 import ttkbootstrap as ttkb
 from tkinter import *
 from tkinter import messagebox, filedialog
-from PIL import Image, ImageTk  # Install Pillow for image handling
 import mysql.connector
 import bcrypt
 import os
+import json
 
 # Global definition of theme_combobox
 theme_combobox = None
 current_user = None
 
+# Function to save the selected theme to a file
+def save_theme(selected_theme):
+    with open("theme_settings.json", "w") as file:
+        json.dump({"theme": selected_theme}, file)
+
+# Function to load the selected theme from a file
+def load_theme():
+    if os.path.exists("theme_settings.json"):
+        with open("theme_settings.json", "r") as file:
+            theme_data = json.load(file)
+            return theme_data.get("theme", "darkly")  # Default to "darkly" if no theme is saved
+    return "darkly"  # Default theme if no theme settings file exists
+
 def change_theme():
     selected_theme = theme_combobox.get()  # Get selected theme
     m.style.theme_use(selected_theme)  # Change the theme using ttkbootstrap method
     m.update_idletasks()  # Update the window to apply the changes
+    save_theme(selected_theme)  # Save the selected theme to file
 
 def start_app(selected_theme):
     global m, theme_combobox, current_user  # Declare global variables
@@ -266,4 +280,4 @@ def start_app(selected_theme):
     m.mainloop()
 
 # Start the app with the initial theme
-start_app("darkly")
+start_app(load_theme())  # Load the saved theme at startup
